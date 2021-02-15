@@ -6,7 +6,6 @@ import json
 import pickle
 import numpy as np
 from pathlib import Path
-from Board import Board
 from sklearn.neural_network import MLPRegressor
 from time import sleep
 
@@ -17,15 +16,16 @@ pygame.font.init()
 
 class NextStateCalc:
     def __init__(self):
-        self.win = pygame.display.set_mode((500, 600))
-        self.win.fill(BLACK)
+        self.win = pygame.display.set_mode((500, 690))
         pygame.init()
         pygame.time.set_timer(pygame.USEREVENT, 1000)
         pygame.event.set_blocked(pygame.MOUSEMOTION)
         self.game = True
         while self.game:
             self.create_board()
+            self.win.fill(BLACK)
             self.run = True
+            self.score = 0
             while self.run:
                 ## get action
                 piece_type, action = self.get_random_input()
@@ -34,19 +34,34 @@ class NextStateCalc:
                 self.apply_action(piece_type, action)
 
                 ## clear rows
-                self.clear_full_lines(self.board)
+                _, num_full_lines = self.clear_full_lines(self.board)
 
-                ## count score
+                ## check if game ends
+                if np.any(self.board[0:3, :] != 0):
+                    self.run = False
+                else:
+                    ## count score
+                    self.score += num_full_lines
+                    ## update board
+                    self.display_array()
+                    sleep(0.4)
 
-                ## update board
-                self.display_array()
-                sleep(0.3)
+                ## QUIT button
+                for event in pygame.event.get():
+                    if event.type == pygame.KEYDOWN:
+                        if event.key == pygame.K_q:
+                            self.game = False
+                            self.run = False
 
     def display_array(self):
+        ## draw boundaries
+        pygame.draw.line(self.win, WHITE, (0, 3 * 30), (10 * 30, 3 * 30))
+        pygame.draw.line(self.win, WHITE, (10 * 30, 3 * 30), (10 * 30, 23 * 30))
+        ## draw blocks
         rows = [x for x in self.board]
         for row_index, row in enumerate(rows):
             for col_index, col in enumerate(row):
-                if col != 0:
+                if col != 0 and row_index >= 3:
                     pygame.draw.rect(
                         self.win,
                         WHITE,
@@ -58,6 +73,17 @@ class NextStateCalc:
                         ),
                         0,
                     )
+                    # pygame.draw.rect(
+                    #     self.win,
+                    #     BLACK,
+                    #     (
+                    #         col_index * 30,
+                    #         row_index * 30,
+                    #         30,
+                    #         30,
+                    #     ),
+                    #     1,
+                    # )
         pygame.display.update()
 
     def apply_action(self, piece_type, action):
@@ -71,50 +97,24 @@ class NextStateCalc:
         ## create piece and push to left edge
         piece = self.piece_array(piece_type, rot)
         piece = self.trim_piece(piece)
+        p_shape = piece.shape
 
-        pos = self.overlap_or_lowest_row(self.board, piece, action)
-        if pos:
-            board[pos[0], pos[1]] = 1
-            return board
-        else:
-            return board
-
-    def get_random_input(self):
-        piece_type = random.randint(1, 7)
-        rot = random.randint(0, 3)
-
-        piece = self.piece_array(piece_type, rot)
-        col = random.randint(0, 20 - piece.shape[1])
-
-        return piece_type, (rot, col)
-
-    def clear_full_lines(self, board):
-        full_lines = np.where(np.all(board == 1, axis=1))
-
-        if bool(len(full_lines[0])):
-            num_full_lines = full_lines[0].shape[0]
-
-            board = np.delete(board, full_lines, axis=0)
-            board = np.vstack((np.zeros((num_full_lines, board.shape[1])), board))
-
-        return board
-
-    def overlap_or_lowest_row(self, board, piece, action):
-        """ if action cannot be applied due to obstacle, return None. else return lowest row"""
-        col = action[1]
-        pos = np.array(np.where(piece == 1))
+        ## place piece in board when possible
         row = 0
 
-        if col + piece.shape[1] >= 10:
-            return None
-        elif np.any(board[row + pos[0], col + pos[1]] == 1):
-            self.run = False
-        else:
-            while row + 1 + max(pos[0]) < 20 and not np.any(
-                board[row + 1 + pos[0], col + pos[1]] == 1
-            ):
-                row += 1
-            return (row + pos[0], col + pos[1])
+        X = board[(row + 1) : (row + 1 + p_shape[0]), col : (col + p_shape[1])] + piece
+
+        while 2 not in X and row + 1 + p_shape[0] < 23:
+            row += 1
+            X = (
+                board[(row + 1) : (row + 1 + p_shape[0]), col : (col + p_shape[1])]
+                + piece
+            )
+
+        board[row : (row + p_shape[0]), col : (col + p_shape[1])] = (
+            board[row : (row + p_shape[0]), col : (col + p_shape[1])] + piece
+        )
+        return board
 
     def piece_array(self, piece_type, rot):
         if piece_type == 1:
@@ -151,7 +151,27 @@ class NextStateCalc:
         return piece
 
     def create_board(self):
-        self.board = np.zeros((20, 10))
+        self.board = np.zeros((23, 10))
+
+    def get_random_input(self):
+        piece_type = random.randint(1, 7)
+        rot = random.randint(0, 3)
+
+        piece = self.piece_array(piece_type, rot)
+        col = random.randint(0, 10 - piece.shape[1])
+
+        return piece_type, (rot, col)
+
+    def clear_full_lines(self, board):
+        full_lines = np.where(np.all(board == 1))
+        num_full_lines = 0
+        if bool(len(full_lines[0])):
+            num_full_lines = full_lines[0].shape[0]
+
+            board = np.delete(board, full_lines, axis=0)
+            board = np.vstack((np.zeros((num_full_lines, board.shape[1])), board))
+
+        return board, num_full_lines
 
 
 nsc = NextStateCalc()
