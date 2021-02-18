@@ -80,7 +80,9 @@ class NextStateCalc:
                         if event.key == pygame.K_q:
                             self.game = False
                             self.run = False
-                sleep(0.1)
+                        elif event.key == pygame.K_p:
+                            self.pause_screen()
+                # sleep(0.1)
             """ after 5 games, go to next weight.
                 after getting weight performance for all 10 weights, initiate update step.
                 update step involves testing new x and new positions.
@@ -120,6 +122,20 @@ class NextStateCalc:
                         ),
                         0,
                     )
+        # for row_index, row in enumerate(rows):
+        #     for col_index, col in enumerate(row):
+        #         if col != 0 and row_index >= 3:
+        #             pygame.draw.rect(
+        #                 self.win,
+        #                 BLACK,
+        #                 (
+        #                     col_index * 30,
+        #                     row_index * 30,
+        #                     30,
+        #                     30,
+        #                 ),
+        #                 2,
+        #             )
         # Game Count
         font = pygame.font.SysFont("ComicSans", 40)
         text = font.render("Game Count", 1, (255, 255, 255))
@@ -177,7 +193,7 @@ class NextStateCalc:
             text_eval, (self.width * self.gap + int(self.gap / 2), 9 * self.gap)
         )
         self.win.blit(
-            max_eval, (self.width * self.gap + int(self.gap / 2), 9.5 * self.gap)
+            max_eval, (self.width * self.gap + int(self.gap / 2), 9.7 * self.gap)
         )
 
         ## display x
@@ -198,21 +214,23 @@ class NextStateCalc:
             str(self.x[self.weight_index][4])[0:5], 1, (255, 255, 255)
         )
 
-        self.win.blit(text, (self.width * self.gap + int(self.gap / 2), 10 * self.gap))
         self.win.blit(
-            weight0, (self.width * self.gap + int(self.gap / 2), 10.5 * self.gap)
+            text, (self.width * self.gap + int(self.gap / 2), 10.5 * self.gap)
         )
         self.win.blit(
-            weight1, (self.width * self.gap + int(self.gap / 2), 11 * self.gap)
+            weight0, (self.width * self.gap + int(self.gap / 2), 11 * self.gap)
         )
         self.win.blit(
-            weight2, (self.width * self.gap + int(self.gap / 2), 11.5 * self.gap)
+            weight1, (self.width * self.gap + int(self.gap / 2), 11.5 * self.gap)
         )
         self.win.blit(
-            weight3, (self.width * self.gap + int(self.gap / 2), 12 * self.gap)
+            weight2, (self.width * self.gap + int(self.gap / 2), 12 * self.gap)
         )
         self.win.blit(
-            weight4, (self.width * self.gap + int(self.gap / 2), 12.5 * self.gap)
+            weight3, (self.width * self.gap + int(self.gap / 2), 12.5 * self.gap)
+        )
+        self.win.blit(
+            weight4, (self.width * self.gap + int(self.gap / 2), 13 * self.gap)
         )
         text_eval = font.render("x weight performance", 1, (255, 255, 255))
         max_eval = font.render(
@@ -220,19 +238,55 @@ class NextStateCalc:
         )
 
         self.win.blit(
-            text_eval, (self.width * self.gap + int(self.gap / 2), 13.5 * self.gap)
+            text_eval, (self.width * self.gap + int(self.gap / 2), 14 * self.gap)
         )
         self.win.blit(
-            max_eval, (self.width * self.gap + int(self.gap / 2), 14 * self.gap)
+            max_eval, (self.width * self.gap + int(self.gap / 2), 14.6 * self.gap)
         )
 
         ## display stats
-        holes = font.render("Holes: ", 1, (255, 255, 255))
+        holes = font.render("holes: ", 1, (255, 255, 255))
         num_holes = font.render(
             str(self.stat.num_holes(self.board)), 1, (255, 255, 255)
         )
-        self.win.blit(holes, (self.width * self.gap + int(self.gap / 2), 15 * self.gap))
-        self.win.blit(num_holes, (self.width * self.gap + self.gap * 3, 15 * self.gap))
+        self.win.blit(holes, (self.width * self.gap + int(self.gap / 2), 16 * self.gap))
+        self.win.blit(num_holes, (self.width * self.gap + self.gap * 4, 16 * self.gap))
+
+        holes = font.render("row trans: ", 1, (255, 255, 255))
+        num_holes = font.render(
+            str(self.stat.row_transition(self.board)), 1, (255, 255, 255)
+        )
+        self.win.blit(
+            holes, (self.width * self.gap + int(self.gap / 2), 16.5 * self.gap)
+        )
+        self.win.blit(
+            num_holes, (self.width * self.gap + self.gap * 4, 16.5 * self.gap)
+        )
+
+        holes = font.render("col trans: ", 1, (255, 255, 255))
+        num_holes = font.render(
+            str(self.stat.col_transition(self.board)), 1, (255, 255, 255)
+        )
+        self.win.blit(holes, (self.width * self.gap + int(self.gap / 2), 17 * self.gap))
+        self.win.blit(num_holes, (self.width * self.gap + self.gap * 4, 17 * self.gap))
+
+        holes = font.render("well sums: ", 1, (255, 255, 255))
+        num_holes = font.render(
+            str(self.stat.well_sums(self.board)), 1, (255, 255, 255)
+        )
+        self.win.blit(
+            holes, (self.width * self.gap + int(self.gap / 2), 17.5 * self.gap)
+        )
+        self.win.blit(
+            num_holes, (self.width * self.gap + self.gap * 4, 17.5 * self.gap)
+        )
+
+        holes = font.render("bumpiness: ", 1, (255, 255, 255))
+        num_holes = font.render(
+            str(self.stat.bumpiness(self.board)), 1, (255, 255, 255)
+        )
+        self.win.blit(holes, (self.width * self.gap + int(self.gap / 2), 18 * self.gap))
+        self.win.blit(num_holes, (self.width * self.gap + self.gap * 4, 18 * self.gap))
         pygame.display.update()
 
     def apply_action(self, piece_type, action):
@@ -429,6 +483,16 @@ class NextStateCalc:
         self.weight_perf = []
         self.update_perf = []
 
+    def pause_screen(
+        self,
+    ):
+        run = True
+        while run:
+            for event in pygame.event.get():
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_p:
+                        run = False
+
 
 class Stats:
     def __init__(self):
@@ -439,16 +503,14 @@ class Stats:
         first_nonzero_row = np.argmax(board, axis=0)
 
         holes_in_col = (board.shape[0] - first_nonzero_row) - sum_cols
-        holes_in_col = holes_in_col % 20
-        import pdb
+        holes_in_col = holes_in_col % 23
 
-        pdb.set_trace()
         return sum(holes_in_col)
 
     def row_transition(self, board):
         row_trans = 0
         for row in board:
-            if np.any(np.where(row)):
+            if np.any(np.where(row == 0)) and ~np.all(row == 0):
                 for col_index in range(len(row)):
                     try:
                         if row[col_index] - row[col_index + 1] != 0:
@@ -470,8 +532,12 @@ class Stats:
         return well_sum
 
     def bumpiness(self, board):
-        col_sums = np.sum(board, axis=0)
-        return np.sum(col_sums[1:] - col_sums[0:-1])
+        turned_board = board.T
+        col_sums = [(23 - np.argmax(col)) % 23 for col in turned_board]
+        height_diff = [
+            np.abs(col_sums[i + 1] - col_sums[i]) for i in range(len(col_sums) - 1)
+        ]
+        return sum(height_diff)
 
 
 nsc = NextStateCalc()
