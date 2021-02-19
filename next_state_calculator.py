@@ -21,9 +21,9 @@ class NextStateCalc:
         self.gap = 30
         self.width = 10
         self.stat = Stats()
-        self.SPO_weights = np.random.rand(10, 5)
-        self.velocities = 2 * np.random.rand(10, 5) - 1
-        self.x = np.random.rand(10, 5)
+        self.SPO_weights = 2 * np.random.rand(10, 6) - 1
+        self.velocities = 4 * np.random.rand(10, 6) - 2
+        self.x = 2 * np.random.rand(10, 6) - 1
         self.current_weights = self.SPO_weights
         self.weight_index = 0
         self.weight_perf = []
@@ -46,6 +46,7 @@ class NextStateCalc:
             self.run = True
             self.score = 0
             self.game_count += 1
+            self.lines_cleared = 0
             while self.run:
                 print("--------------------------------")
                 print("update step: ", self.update_step)
@@ -71,6 +72,8 @@ class NextStateCalc:
                 else:
                     ## count score
                     self.score += self.num_full_lines * 100 + 1
+                    ## count cleared lines
+                    self.lines_cleared += self.num_full_lines
                     ## update board
                     self.display_array_score()
 
@@ -145,8 +148,8 @@ class NextStateCalc:
 
         # Write Score
         font = pygame.font.SysFont("ComicSans", 40)
-        text = font.render("Score", 1, (255, 255, 255))
-        score = font.render(str(self.score), 1, (255, 255, 255))
+        text = font.render("Lines Cleared", 1, (255, 255, 255))
+        score = font.render(str(self.lines_cleared), 1, (255, 255, 255))
         self.win.blit(text, (self.width * self.gap + int(self.gap / 2), 3 * self.gap))
         self.win.blit(score, (self.width * self.gap + int(self.gap / 2), 4 * self.gap))
 
@@ -167,6 +170,9 @@ class NextStateCalc:
         )
         weight4 = font.render(
             str(self.SPO_weights[self.weight_index][4])[0:5], 1, (255, 255, 255)
+        )
+        weight5 = font.render(
+            str(self.SPO_weights[self.weight_index][5])[0:5], 1, (255, 255, 255)
         )
         text_eval = font.render("weight performance", 1, (255, 255, 255))
         max_eval = font.render(
@@ -190,10 +196,13 @@ class NextStateCalc:
             weight4, (self.width * self.gap + int(self.gap / 2), 8 * self.gap)
         )
         self.win.blit(
-            text_eval, (self.width * self.gap + int(self.gap / 2), 9 * self.gap)
+            weight5, (self.width * self.gap + int(self.gap / 2), 8.5 * self.gap)
         )
         self.win.blit(
-            max_eval, (self.width * self.gap + int(self.gap / 2), 9.7 * self.gap)
+            text_eval, (self.width * self.gap + int(self.gap / 2), 9.5 * self.gap)
+        )
+        self.win.blit(
+            max_eval, (self.width * self.gap + int(self.gap / 2), 10.2 * self.gap)
         )
 
         ## display x
@@ -213,24 +222,25 @@ class NextStateCalc:
         weight4 = font.render(
             str(self.x[self.weight_index][4])[0:5], 1, (255, 255, 255)
         )
+        weight5 = font.render(
+            str(self.x[self.weight_index][5])[0:5], 1, (255, 255, 255)
+        )
 
+        self.win.blit(text, (self.width * self.gap + int(self.gap / 2), 11 * self.gap))
         self.win.blit(
-            text, (self.width * self.gap + int(self.gap / 2), 10.5 * self.gap)
+            weight0, (self.width * self.gap + int(self.gap / 2), 11.5 * self.gap)
         )
         self.win.blit(
-            weight0, (self.width * self.gap + int(self.gap / 2), 11 * self.gap)
+            weight1, (self.width * self.gap + int(self.gap / 2), 12 * self.gap)
         )
         self.win.blit(
-            weight1, (self.width * self.gap + int(self.gap / 2), 11.5 * self.gap)
+            weight2, (self.width * self.gap + int(self.gap / 2), 12.5 * self.gap)
         )
         self.win.blit(
-            weight2, (self.width * self.gap + int(self.gap / 2), 12 * self.gap)
+            weight3, (self.width * self.gap + int(self.gap / 2), 13 * self.gap)
         )
         self.win.blit(
-            weight3, (self.width * self.gap + int(self.gap / 2), 12.5 * self.gap)
-        )
-        self.win.blit(
-            weight4, (self.width * self.gap + int(self.gap / 2), 13 * self.gap)
+            weight4, (self.width * self.gap + int(self.gap / 2), 13.5 * self.gap)
         )
         text_eval = font.render("x weight performance", 1, (255, 255, 255))
         max_eval = font.render(
@@ -238,10 +248,10 @@ class NextStateCalc:
         )
 
         self.win.blit(
-            text_eval, (self.width * self.gap + int(self.gap / 2), 14 * self.gap)
+            text_eval, (self.width * self.gap + int(self.gap / 2), 14.5 * self.gap)
         )
         self.win.blit(
-            max_eval, (self.width * self.gap + int(self.gap / 2), 14.6 * self.gap)
+            max_eval, (self.width * self.gap + int(self.gap / 2), 15.1 * self.gap)
         )
 
         ## display stats
@@ -281,12 +291,12 @@ class NextStateCalc:
             num_holes, (self.width * self.gap + self.gap * 4, 17.5 * self.gap)
         )
 
-        holes = font.render("bumpiness: ", 1, (255, 255, 255))
-        num_holes = font.render(
-            str(self.stat.bumpiness(self.board)), 1, (255, 255, 255)
-        )
-        self.win.blit(holes, (self.width * self.gap + int(self.gap / 2), 18 * self.gap))
-        self.win.blit(num_holes, (self.width * self.gap + self.gap * 4, 18 * self.gap))
+        # holes = font.render("landing: ", 1, (255, 255, 255))
+        # num_holes = font.render(
+        #     str(self.stat.bumpiness(self.board)), 1, (255, 255, 255)
+        # )
+        # self.win.blit(holes, (self.width * self.gap + int(self.gap / 2), 18 * self.gap))
+        # self.win.blit(num_holes, (self.width * self.gap + self.gap * 4, 18 * self.gap))
         pygame.display.update()
 
     def apply_action(self, piece_type, action):
@@ -396,6 +406,7 @@ class NextStateCalc:
         action_score = []
         for rot in range(4):
             piece = self.piece_array(piece_type, rot)
+            piece = self.trim_piece(piece)
             for col in range(0, 11 - piece.shape[1]):
                 board = self.board.copy()
                 board, row = self.place_board(board, piece_type, (rot, col))
@@ -407,20 +418,24 @@ class NextStateCalc:
                         self.evaluate(
                             np.array(
                                 [
+                                    num_full_lines,
                                     stat.num_holes(board),
                                     stat.row_transition(board),
                                     stat.col_transition(board),
                                     stat.well_sums(board),
-                                    stat.bumpiness(board),
+                                    # stat.bumpiness(board),
+                                    23 - row,
                                 ]
                             )
                         ),
+                        23 - row,
                     )
                 )
 
         best_config = max(action_score, key=lambda x: x[1])
         best_action = best_config[0]
         self.max_eval = best_config[1]
+        print("landing: ", best_config[2])
         return best_action
 
     def initiate_neural_network(self):
@@ -452,18 +467,24 @@ class NextStateCalc:
 
         ## update velocity
 
-        self.velocities = 0.9 * self.velocities + 0.1 * r1 * (
-            np.array(
-                [
-                    best_weight,
-                ]
-                * 10
+        self.velocities = (
+            0.1 * self.velocities
+            + 0.8
+            * r1
+            * (
+                np.array(
+                    [
+                        best_weight,
+                    ]
+                    * 10
+                )
+                - self.x
             )
-            - self.x
+            + 0.5 * r2 * (self.SPO_weights - self.x)
         )
 
         ## update x
-        self.x = self.x + 0.2 * self.velocities
+        self.x = self.x + 0.9 * self.velocities
         self.update_step = True
         self.weight_index = 0
         self.current_weights = self.x
@@ -524,10 +545,20 @@ class Stats:
 
     def well_sums(self, board):
         well_sum = 0
-        col_sums = np.sum(board, axis=0)
-        for col in range(len(col_sums) - 1):
-            if col_sums[col + 1] == 0 and col_sums[col] != 0:
-                well_sum += col_sums[col]
+        height = (23 - np.argmax(board, axis=0)) % 23
+
+        if height[0] < height[1]:
+            well_sum += height[1] - height[0]
+        if height[-2] > height[-1]:
+            well_sum += height[-2] - height[-1]
+
+        well_sum += sum(
+            [
+                min(height[i - 1] - height[i], height[i + 1] - height[i])
+                for i in range(1, 9)
+                if height[i] < height[i + 1] and height[i] < height[i - 1]
+            ]
+        )
 
         return well_sum
 
