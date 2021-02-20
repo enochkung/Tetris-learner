@@ -77,7 +77,7 @@ class NextStateCalc:
                     ## update board
                     self.display_array_score()
 
-                ## QUIT button
+                ## QUIT, PAUSE, LOAD PREVIOUS LEARNING button
                 for event in pygame.event.get():
                     if event.type == pygame.KEYDOWN:
                         if event.key == pygame.K_q:
@@ -85,6 +85,8 @@ class NextStateCalc:
                             self.run = False
                         elif event.key == pygame.K_p:
                             self.pause_screen()
+                        elif event.key == pygame.K_c:
+                            self.load_weights()
                 # sleep(0.1)
             """ after 5 games, go to next weight.
                 after getting weight performance for all 10 weights, initiate update step.
@@ -103,6 +105,8 @@ class NextStateCalc:
                     self.weight_performance()
                 if len(self.update_perf) == 10:
                     self.update_weights()
+
+        self.save_weights()
 
     def display_array_score(self):
         self.win.fill(BLACK)
@@ -461,6 +465,7 @@ class NextStateCalc:
         best_value = max(self.weight_perf)
         index_of_best = self.weight_perf.index(best_value)
         best_weight = self.SPO_weights[index_of_best, :]
+        self.best_weight = best_weight
 
         r1 = random.random()
         r2 = random.random()
@@ -513,6 +518,77 @@ class NextStateCalc:
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_p:
                         run = False
+
+    def save_weights(self):
+        SPO_weights_file = (
+            "C:\\Users\\SAMSUNG\\Desktop\\enochk\\Python Programs\\Tetris\\SPO_weights"
+        )
+
+        with open(SPO_weights_file, "wb") as file:
+            pickle.dump(self.SPO_weights, file)
+
+        x_file = "C:\\Users\\SAMSUNG\\Desktop\\enochk\\Python Programs\\Tetris\\x_pos_weights"
+
+        with open(x_file, "wb") as file:
+            pickle.dump(self.x, file)
+
+        velocities_file = (
+            "C:\\Users\\SAMSUNG\\Desktop\\enochk\\Python Programs\\Tetris\\velocities"
+        )
+
+        with open(velocities_file, "wb") as file:
+            pickle.dump(self.velocities, file)
+
+        best_weight_file = (
+            "C:\\Users\\SAMSUNG\\Desktop\\enochk\\Python Programs\\Tetris\\best_weight"
+        )
+
+        with open(best_weight_file, "wb") as file:
+            pickle.dump(self.best_weight, file)
+
+    def load_weights(self):
+        SPO_weights_file = (
+            "C:\\Users\\SAMSUNG\\Desktop\\enochk\\Python Programs\\Tetris\\SPO_weights"
+        )
+
+        try:
+            with open(SPO_weights_file, "rb") as file:
+                import pdb
+
+                pdb.set_trace()
+                self.SPO_weights = pickle.load(file)
+        except FileNotFoundError:
+            self.SPO_weights = 2 * np.random.rand(10, 6) - 1
+
+        x_file = "C:\\Users\\SAMSUNG\\Desktop\\enochk\\Python Programs\\Tetris\\x_pos_weights"
+
+        try:
+            with open(x_file, "rb") as file:
+                self.x = pickle.load(file)
+        except FileNotFoundError:
+            self.x = 2 * np.random.rand(10, 6) - 1
+
+        velocities_file = (
+            "C:\\Users\\SAMSUNG\\Desktop\\enochk\\Python Programs\\Tetris\\velocities"
+        )
+
+        try:
+            with open(velocities_file, "rb") as file:
+                self.velocities = pickle.load(file)
+        except FileNotFoundError:
+            self.velocities = 4 * np.random.rand(10, 6) - 2
+
+        best_weight_file = (
+            "C:\\Users\\SAMSUNG\\Desktop\\enochk\\Python Programs\\Tetris\\best_weight"
+        )
+
+        try:
+            with open(best_weight_file, "rb") as file:
+                self.best_weight = pickle.load(file)
+        except FileNotFoundError:
+            self.best_weight = np.random.rand(1, 6)
+
+    # def restart_bad_weights(self):
 
 
 class Stats:
