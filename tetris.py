@@ -2,8 +2,9 @@
 
 import pygame
 import random
-import json
-import pickle
+
+# import json
+# import pickle
 import numpy as np
 from pathlib import Path
 from sklearn.tree import DecisionTreeRegressor
@@ -11,23 +12,23 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import normalize
 from sklearn.neural_network import MLPRegressor
 from time import sleep
+from learner import Learner, Stats
+from board_mechanics import Board
 
 BLACK = (31, 29, 36)
 WHITE = (177, 156, 217)  # (255, 255, 255)
 pygame.font.init()
 
 """
-One cycle:
+running Tetris game where actions are chosen by a learner
 
-1. Start with random inputs
-2. Calculate all stats into a vector and record it, the current piece, and the action to input array
-3. Record the score and put to output array
-4. Once reaching 500 records, train model.
-5. In new cycle, inputs are created with epsilon chance of random and 1 - epsilon chance of being the action that model generates the highest score
- """
+Press p to pause game
+Press q to quite game
+
+"""
 
 
-class TreeTetris:
+class QTetris:
     def __init__(self):
         self.score = 0
         self.bag = None
@@ -42,32 +43,40 @@ class TreeTetris:
         self.update_step = False
         self.game_count = 0
         self.score_rec = 0
-        self.alpha = 0.9
+        self.alpha = 0.5
         self.gamma = 0.9
 
-        ## initiate tree: tree predicts Q value of input
-        # self.tetris_tree = DecisionTreeRegressor(min_samples_leaf=10)
-        self.tetris_tree = MLPRegressor(hidden_layer_sizes=(50, 20, 10))
+        ## initiate learner
+        self.learner = Learner()
+        self.tetris_learner = self.learner.learner
         ## run game
         self.initiate_game()
 
-    def initiate_game(self):
+    def new_game_init(self):
         self.win = pygame.display.set_mode((500, 690))
         pygame.init()
         pygame.time.set_timer(pygame.USEREVENT, 1000)
         pygame.event.set_blocked(pygame.MOUSEMOTION)
         self.game = True
 
+    def new_run_init(self):
+        self.create_board()
+        self.win.fill(BLACK)
+        self.run = True
+        self.score = 0
+        self.game_count += 1
+        self.lines_cleared = 0
+        self.move_count = 0
+        self.game_input = []
+        self.game_output = []
+
+    def initiate_game(self):
+        self.new_game_init()
+
         while self.game:
-            self.create_board()
-            self.win.fill(BLACK)
-            self.run = True
-            self.score = 0
-            self.game_count += 1
-            self.lines_cleared = 0
-            self.move_count = 0
-            self.game_input = []
-            self.game_output = []
+
+            self.new_run_init()
+
             while self.run:
                 ## get action: random or optained by tree
                 piece_type, action = self.get_action()
@@ -79,43 +88,35 @@ class TreeTetris:
 
                 ## clear rows
                 self.board, self.num_full_lines = self.clear_full_lines(self.board)
+                post_action_board = self.board.copy()
 
+                inputs, output = self.learner.update_record(
+                    post_action_board, self.num_full_lines, self.game_count
+                )
                 ## check if game ends
                 if np.any(self.board[0:3, :] != 0):
-                    self.score -= 10
-                    """record input and output"""
-                    self.update_records(
-                        -10, pre_action_board, piece_type, action, dump=True
-                    )
 
-                    self.score_rec += self.score
+                    output -= 10
+
+                    self.input_record.append(inputs)
+                    self.output_record.append(output)
+
                     self.run = False
+                    if self.game_count % 15 == 14:
+                        self.learner.updating_model(
+                            self.input_record, self.output_record
+                        )
+                        self.learner.print_model_pred(
+                            self.input_record, self.output_record
+                        )
+                        if len(self.output_record) > 1000:
+                            self.remove_old_records()
                 else:
                     ## count score
-                    try:
-                        self.score += (
-                            self.num_full_lines * 100
-                            - (23 - np.where(np.any(self.board, axis=1))[0][0])
-                            + self.move_count * 2
-                        )
-                        self.update_records(
-                            self.num_full_lines * 100
-                            - (23 - np.where(np.any(self.board, axis=1))[0][0])
-                            + self.move_count * 2,
-                            pre_action_board,
-                            piece_type,
-                            action,
-                        )
-                    except:
-                        self.score += self.num_full_lines * 100 + self.move_count * 2
-                        """record input and output"""
-                        self.update_records(
-                            self.num_full_lines * 100 + self.move_count * 2,
-                            pre_action_board,
-                            piece_type,
-                            action,
-                        )
+                    output += 1
 
+                    self.input_record.append(inputs)
+                    self.output_record.append(output)
                     ## count cleared lines
                     self.lines_cleared += self.num_full_lines
                     ## update board
@@ -131,29 +132,22 @@ class TreeTetris:
                             self.pause_screen()
 
     def get_action(self):
-
+        """ get best action """
         ## get next piece
         piece_type = self.get_next_piece()
 
         ep = random.random()
-        if self.game_count < 300:
-            ## if beginning or 1% of cases generate a random action
-            rot = self.move_count % 4
-            piece = self.piece_array(piece_type, rot)
-            col = (2 * self.move_count) % (10 - piece.shape[1] + 1)
-        elif ep < max(0.6 / np.log(self.game_count), 0.05):
-            ## if beginning or 1% of cases generate a random action
-            # rot = random.randint(0, 3)
-            # piece = self.piece_array(piece_type, rot)
-            # col = random.randint(0, 10 - piece.shape[1])
+        if ep < 0.05:
+            ## generate random action with 5% probability
             rot = self.move_count % 4
             piece = self.piece_array(piece_type, rot)
             col = (2 * self.move_count) % (10 - piece.shape[1] + 1)
         else:
-            ## action generated by tree
-            action_and_predict_score = self.get_tree_action(piece_type)
-            rot = action_and_predict_score[0]
-            col = action_and_predict_score[1]
+            ## action generated by learner
+            test_board = self.board.copy()
+            action_score_pair = self.learner.get_best_action(test_board, piece_type)
+            rot = action_score_pair[0][0]
+            col = action_score_pair[0][1]
 
         return piece_type, (rot, col)
 
@@ -163,81 +157,25 @@ class TreeTetris:
         for rot in range(4):
             piece = self.piece_array(piece_type, rot)
             for col in range(10 - piece.shape[1] + 1):
-                test_vector = list(self.board.flatten())
+                """ apply action and then calculate its features, plug into neural network or tree, get score """
+                test_board = self.board.copy()
+                test_board, _ = self.place_board(test_board, piece_type, (rot, col))
+                test_board, full_lines = self.clear_full_lines(test_board)
+                test_vector = self.stat.all_stat_in_vector(test_board)
                 test_vector.extend([piece_type, rot, col])
 
                 ## apply action
-                predict_score = self.tetris_tree.predict(normalize([test_vector]))[0]
+                predict_score = full_lines ** 2 * 10
                 predict_score_collection.append((rot, col, predict_score))
 
         return max(predict_score_collection, key=lambda y: y[2])
 
-    def training_tree(self):
-        print("trained")
-        self.tetris_tree.fit(self.input_record, self.output_record)
+    def remove_old_records(self):
+        """ remove old half of existing records """
 
-    def update_records(self, score, pre_action_board, piece_type, action, dump=False):
-        if len(self.input_record) >= 5000:
-            normalize(self.input_record)
-            print([x[0] for x in self.output_record if x[0] < 0 or x[0] > 80])
-            self.training_tree()
-            ## keep some old records
-            self.keep_old_records()
-
-        ## add current board and score to input and output
-        stat_vector = list(pre_action_board.flatten())
-        stat_vector.extend([piece_type, action[0], action[1]])
-        self.game_input.append(stat_vector)
-        try:
-            self.game_output.append(
-                [
-                    self.tetris_tree.predict(stat_vector) * (1 - self.alpha)
-                    + self.alpha * (score + self.gamma * self.max_next_q(self.board))
-                ]
-            )
-        except:
-            self.game_output.append([score])
-
-        if dump:
-            ## record stats, piece, and action as input
-            self.input_record.extend(self.game_input)
-            ## record score as output
-            self.output_record.extend(self.game_output)
-            ## erase game input and output
-            self.game_input = []
-            self.game_output = []
-
-    def keep_old_records(self):
-        """ keep the 500 records with the largest scores """
-        large_rec = [
-            (self.input_record[i], self.output_record[i])
-            for i in range(len(self.input_record))
-            if self.output_record[i][0] > 80
-        ]
-
-        if large_rec:
-            self.input_record = [x[0] for x in large_rec]
-            self.output_record = [x[1] for x in large_rec]
-            while len(self.input_record) < 100:
-                self.input_record.extend([x[0] for x in large_rec])
-                self.output_record.extend([x[1] for x in large_rec])
-        else:
-            self.input_record = []
-            self.output_record = []
-
-    def max_next_q(self, board):
-        flat_board = list(board.flatten())
-        predict_score_collection = []
-        for piece_type in range(7):
-            for rot in range(4):
-                piece = self.piece_array(piece_type, rot)
-                for col in range(10 - piece.shape[1] + 1):
-                    test_input = flat_board.copy()
-                    flat_board.extend([piece_type, rot, col])
-                    predict_score_collection.append(
-                        self.tetris_tree.predict(flat_board)[0]
-                    )
-        return max(predict_score_collection)
+        half_record_size = int(9 * len(self.output_record) / 10)
+        del self.input_record[0:half_record_size]
+        del self.output_record[0:half_record_size]
 
     def display_array_score(self):
         self.win.fill(BLACK)
@@ -287,6 +225,19 @@ class TreeTetris:
         score = font.render(str(self.lines_cleared), 1, (255, 255, 255))
         self.win.blit(text, (self.width * self.gap + int(self.gap / 2), 3 * self.gap))
         self.win.blit(score, (self.width * self.gap + int(self.gap / 2), 4 * self.gap))
+
+        font = pygame.font.SysFont("ComicSans", 30)
+        text = font.render("Move Count", 1, (255, 255, 255))
+        count = font.render(str(self.move_count), 1, (255, 255, 255))
+        self.win.blit(text, (self.width * self.gap + int(self.gap / 2), 5 * self.gap))
+        self.win.blit(count, (self.width * self.gap + int(self.gap / 2), 6 * self.gap))
+
+        # Write Score
+        font = pygame.font.SysFont("ComicSans", 30)
+        text = font.render("Dataset Size", 1, (255, 255, 255))
+        score = font.render(str(len(self.input_record)), 1, (255, 255, 255))
+        self.win.blit(text, (self.width * self.gap + int(self.gap / 2), 7 * self.gap))
+        self.win.blit(score, (self.width * self.gap + int(self.gap / 2), 8 * self.gap))
 
         ## display stats
         font = pygame.font.SysFont("ComicSans", 20)
@@ -420,6 +371,10 @@ class TreeTetris:
         num_full_lines = 0
 
         if full_lines[0].shape[0] != 0:
+            if full_lines[0].shape[0] >= 2:
+                import pdb
+
+                pdb.set_trace()
             num_full_lines = full_lines[0].shape[0]
             board = np.delete(board, full_lines, axis=0)
             board = np.vstack((np.zeros((num_full_lines, board.shape[1])), board))
@@ -437,68 +392,4 @@ class TreeTetris:
                         run = False
 
 
-class Stats:
-    def __init__(self):
-        pass
-
-    def all_stat_in_vector(self, board):
-        return [
-            self.num_holes(board),
-            self.row_transition(board),
-            self.col_transition(board),
-            self.well_sums(board),
-            self.bumpiness(board),
-        ]
-
-    def num_holes(self, board):
-        sum_cols = sum(board)
-        first_nonzero_row = np.argmax(board, axis=0)
-
-        holes_in_col = (board.shape[0] - first_nonzero_row) - sum_cols
-        holes_in_col = holes_in_col % 23
-        return sum(holes_in_col)
-
-    def row_transition(self, board):
-        row_trans = 0
-        for row in board:
-            if np.any(np.where(row == 0)) and ~np.all(row == 0):
-                for col_index in range(len(row)):
-                    try:
-                        if row[col_index] - row[col_index + 1] != 0:
-                            row_trans += 1
-                    except:
-                        continue
-        return row_trans
-
-    def col_transition(self, board):
-        return self.row_transition(board.T)
-
-    def well_sums(self, board):
-        well_sum = 0
-        height = (23 - np.argmax(board, axis=0)) % 23
-
-        if height[0] < height[1]:
-            well_sum += height[1] - height[0]
-        if height[-2] > height[-1]:
-            well_sum += height[-2] - height[-1]
-
-        well_sum += sum(
-            [
-                min(height[i - 1] - height[i], height[i + 1] - height[i])
-                for i in range(1, 9)
-                if height[i] < height[i + 1] and height[i] < height[i - 1]
-            ]
-        )
-
-        return well_sum
-
-    def bumpiness(self, board):
-        turned_board = board.T
-        col_sums = [(23 - np.argmax(col)) % 23 for col in turned_board]
-        height_diff = [
-            np.abs(col_sums[i + 1] - col_sums[i]) for i in range(len(col_sums) - 1)
-        ]
-        return sum(height_diff)
-
-
-nsc = TreeTetris()
+nsc = QTetris()
